@@ -46,18 +46,20 @@ using std::string;
 using std::swap;
 using std::vector;
 using vector_map::VectorMap;
+using std::abs;
 
 namespace slam {
 
 SLAM::SLAM() :
     prev_odom_loc_(0, 0),
     prev_odom_angle_(0),
-    odom_initialized_(false) {}
+    odom_initialized_(false),
+    has_new_pose(false) {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = Vector2f(0, 0);
-  *angle = 0;
+  *loc = prev_odom_loc_;
+  *angle = prev_odom_angle_;
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -68,6 +70,15 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
+  if (has_new_pose == true) {
+    has_new_pose = false;
+  } else {
+    return;
+  }
+}
+
+float getDist(const Vector2f& odom, const Vector2f& prev_odom) {
+  return sqrt( pow(prev_odom.x() - odom.x(), 2) + pow(pre_odom.y() - odom.y()) );
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
@@ -75,10 +86,16 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
     prev_odom_angle_ = odom_angle;
     prev_odom_loc_ = odom_loc;
     odom_initialized_ = true;
+    has_new_pose = true;
     return;
   }
   // Keep track of odometry to estimate how far the robot has moved between 
   // poses.
+  if ( abs(odom_angle - prev_odom_angle_) < MIN_DELTA_A|| getDist(odom_loc, prev_odom_loc_) < MIN_DELTA_D ) {
+    prev_odom_angle_ = odom_angle;
+    prev_odom_loc_ = odom_loc;
+    has_new_pose = true;
+  } 
 }
 
 vector<Vector2f> SLAM::GetMap() {
@@ -89,3 +106,14 @@ vector<Vector2f> SLAM::GetMap() {
 }
 
 }  // namespace slam
+
+/**
+ * How to construct the map from the lookup table?
+ * Likelihood lookup table -- what should be the increment value? 
+ * Do we need to calculate p(s_{i+1}|x_i, x_{i+1}, x_i) ?
+ * What if we go to the same location again (moving in a circle? Do we want to update the lookup table 
+ *    entry, or just add a new one for every new pose?
+ * Do we discard old data? When, and by what criteria?
+ * Are laser readings our landmarks in this context?
+ *    If not, what are the labdmarks and how do we correlate the landmarks?
+ * */

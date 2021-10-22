@@ -58,6 +58,11 @@ class SLAM {
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
+  
+  float MIN_DELTA_A = M_PI / 180.0 * 30.0; // 30 degrees translate to radius
+  float MIN_DELTA_D = 0.5;
+
+  bool has_new_pose;
 };
 }  // namespace slam
 
