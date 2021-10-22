@@ -51,15 +51,20 @@ using std::abs;
 namespace slam {
 
 SLAM::SLAM() :
-    prev_odom_loc_(0, 0),
-    prev_odom_angle_(0),
-    odom_initialized_(false),
-    has_new_pose(false) {}
+    prev_pose_loc_(0, 0),
+    prev_pose_angle_(0),
+    cur_pose_loc_(0, 0),
+    cur_pose_angle_(0),
+    odom_initialized_(false) {}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = prev_odom_loc_;
+  *loc = prev_pose_loc;
   *angle = prev_odom_angle_;
+}
+
+float getDist(const Vector2f& odom, const Vector2f& prev_odom) {
+  return sqrt( pow(prev_odom.x() - odom.x(), 2) + pow(pre_odom.y() - odom.y()) );
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -70,32 +75,32 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
-  if (has_new_pose == true) {
-    has_new_pose = false;
-  } else {
-    return;
-  }
-}
+  if ( abs(cur_pose_angle_ - prev_pose_angle_) < MIN_DELTA_A && getDist(cur_pose_loc_, prev_pose_loc_) < MIN_DELTA_D ) {return;}
 
-float getDist(const Vector2f& odom, const Vector2f& prev_odom) {
-  return sqrt( pow(prev_odom.x() - odom.x(), 2) + pow(pre_odom.y() - odom.y()) );
+  // TODO: 
+  // for each ray: (x', y') in the new laser frame
+  // transform (x', y') to the prev laser frame
+  
+  // get p(s_{i+1}|x_i, x_{i+1}, s_i) from the lookup table
+  // calculate p(x_{i+1}|x_i, u_i) from lookup table (delta_x, delta_y, delta_theta)
+  // calculate && store current lookup tables
+  // calculate max{ p(s_{i+1}|x_i, x_{i+1}, s_i)p(x_{i+1}|x_i, u_i) }
+  
+  prev_pose_angle_ = cur_pose_angle_;
+  prev_pose_loc_ = cur_pose_loc_;
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_) {
-    prev_odom_angle_ = odom_angle;
-    prev_odom_loc_ = odom_loc;
+    prev_pose_angle = odom_angle;
+    prev_pose_loc = odom_loc;
     odom_initialized_ = true;
-    has_new_pose = true;
     return;
   }
   // Keep track of odometry to estimate how far the robot has moved between 
   // poses.
-  if ( abs(odom_angle - prev_odom_angle_) < MIN_DELTA_A|| getDist(odom_loc, prev_odom_loc_) < MIN_DELTA_D ) {
-    prev_odom_angle_ = odom_angle;
-    prev_odom_loc_ = odom_loc;
-    has_new_pose = true;
-  } 
+  cur_pose_angle_ = odom_angle;
+  cur_pose_loc_ = odom_loc;
 }
 
 vector<Vector2f> SLAM::GetMap() {

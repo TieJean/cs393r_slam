@@ -55,14 +55,14 @@ class SLAM {
  private:
 
   // Previous odometry-reported locations.
-  Eigen::Vector2f prev_odom_loc_;
-  float prev_odom_angle_;
   bool odom_initialized_;
+  Eigen::Vector2f prev_pose_loc_;
+  float prev_pose_angle_;
+  Eigen::Vector2f cur_pose_loc_;
+  float cur_pose_angle_;
   
   float MIN_DELTA_A = M_PI / 180.0 * 30.0; // 30 degrees translate to radius
   float MIN_DELTA_D = 0.5;
-
-  bool has_new_pose;
 };
 }  // namespace slam
 
