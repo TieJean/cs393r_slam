@@ -56,10 +56,10 @@ using std::abs;
 // CONFIG_FLOAT(MOTION_X_STD_DEV, "MOTION_X_STD_DEV");
 // CONFIG_FLOAT(MOTION_Y_STD_DEV, "MOTION_Y_STD_DEV");
 // CONFIG_FLOAT(MOTION_A_STD_DEV, "MOTION_A_STD_DEV");
-// CONFIG_FLOAT(MOTION_DIST_K1, "MOTION_DIST_K1");
-// CONFIG_FLOAT(MOTION_DIST_K2, "MOTION_DIST_K2");
-// CONFIG_FLOAT(MOTION_A_K1, "MOTION_A_K1");
-// CONFIG_FLOAT(MOTION_A_K2, "MOTION_A_K2");
+CONFIG_FLOAT(MOTION_DIST_K1, "MOTION_DIST_K1");
+CONFIG_FLOAT(MOTION_DIST_K2, "MOTION_DIST_K2");
+CONFIG_FLOAT(MOTION_A_K1, "MOTION_A_K1");
+CONFIG_FLOAT(MOTION_A_K2, "MOTION_A_K2");
 // CONFIG_FLOAT(MAX_D_DIST, "MAX_D_DIST");
 // CONFIG_FLOAT(MAX_D_ANGLE, "MAX_D_ANGLE");
 
@@ -67,9 +67,12 @@ namespace slam {
 
 // returns the motion model log likelihood in a Gaussian distribution
 float calculateMotionLikelihood(float x, float y, float a) {
-  // assume the dimensions are independet
-  float d_stddev = DELTA_D_STEP; // TODO: fix me
-  float a_stddev = DELTA_A_STEP; // TODO: fix me
+  // assume the dimensions are independent
+  float d_d = sqrt(pow(x, 2) + pow(y, 2));
+  float d_stddev = CONFIG_MOTION_DIST_K1 * d_d + CONFIG_MOTION_DIST_K2 * abs(a) ; // TODO: fix me
+  float a_stddev = CONFIG_MOTION_A_K1 * d_d + CONFIG_MOTION_A_K2 * abs(a);
+  a_stddev = a_stddev > DELTA_A_BOUND ? DELTA_A_BOUND : a_stddev;
+
   float log_x = - pow(x, 2) / pow(d_stddev, 2);
   float log_y = - pow(y, 2) / pow(d_stddev, 2);
   float log_a = - pow(a, 2) / pow(a_stddev, 2);
