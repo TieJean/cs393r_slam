@@ -48,14 +48,53 @@ using std::vector;
 using vector_map::VectorMap;
 using std::abs;
 
+// CONFIG_FLOAT(GAMMA, "GAMMA");
+// CONFIG_FLOAT(SENSOR_STD_DEV, "SENSOR_STD_DEV");
+// CONFIG_FLOAT(D_SHORT, "D_SHORT");
+// CONFIG_FLOAT(D_LONG, "D_LONG");
+// CONFIG_FLOAT(P_OUTSIDE_RANGE, "P_OUTSIDE_RANGE");
+// CONFIG_FLOAT(MOTION_X_STD_DEV, "MOTION_X_STD_DEV");
+// CONFIG_FLOAT(MOTION_Y_STD_DEV, "MOTION_Y_STD_DEV");
+// CONFIG_FLOAT(MOTION_A_STD_DEV, "MOTION_A_STD_DEV");
+// CONFIG_FLOAT(MOTION_DIST_K1, "MOTION_DIST_K1");
+// CONFIG_FLOAT(MOTION_DIST_K2, "MOTION_DIST_K2");
+// CONFIG_FLOAT(MOTION_A_K1, "MOTION_A_K1");
+// CONFIG_FLOAT(MOTION_A_K2, "MOTION_A_K2");
+// CONFIG_FLOAT(MAX_D_DIST, "MAX_D_DIST");
+// CONFIG_FLOAT(MAX_D_ANGLE, "MAX_D_ANGLE");
+
 namespace slam {
+
+// returns the motion model log likelihood in a Gaussian distribution
+float calculateMotionLikelihood(float x, float y, float a) {
+  // assume the dimensions are independet
+  float d_stddev = DELTA_D_STEP; // TODO: fix me
+  float a_stddev = DELTA_A_STEP; // TODO: fix me
+  float log_x = - pow(x, 2) / pow(d_stddev, 2);
+  float log_y = - pow(y, 2) / pow(d_stddev, 2);
+  float log_a = - pow(a, 2) / pow(a_stddev, 2);
+  return log_x + log_y + log_a;
+}
 
 SLAM::SLAM() :
     prev_pose_loc_(0, 0),
     prev_pose_angle_(0),
     cur_pose_loc_(0, 0),
     cur_pose_angle_(0),
-    odom_initialized_(false) {}
+    odom_initialized_(false) {
+      // populates motion model table
+      for (size_t i = 0; i < prob_motion.length; i++) {
+        float d_x = -DELTA_X_BOUND + i * DELTA_D_STEP;
+        for (size_t j = 0; i < prob_motion[0].length; j++) {
+          float d_y = -DELTA_Y_BOUND + i * DELTA_D_STEP;
+          for (size_t k = 0; k < prob_motion[0][0].length; k++) {
+            float d_a = -DELTA_A_BOUND + k * DELTA_A_STEP;
+            // calculate motion model probability
+            prob_motion[i][j][k] = calculateMotionLikelihood(d_x, d_y, d_a);
+          }
+        }
+      }
+    }
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.

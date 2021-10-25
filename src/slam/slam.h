@@ -28,6 +28,8 @@
 #ifndef SRC_SLAM_H_
 #define SRC_SLAM_H_
 
+using std::round;
+
 namespace slam {
 
 class SLAM {
@@ -53,7 +55,6 @@ class SLAM {
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
  private:
-
   // Previous odometry-reported locations.
   bool odom_initialized_;
   Eigen::Vector2f prev_pose_loc_;
@@ -61,8 +62,25 @@ class SLAM {
   Eigen::Vector2f cur_pose_loc_;
   float cur_pose_angle_;
   
-  float MIN_DELTA_A = M_PI / 180.0 * 30.0; // 30 degrees translate to radius
-  float MIN_DELTA_D = 0.5;
+  // pose constraints
+  const float MIN_DELTA_A = M_PI / 180.0 * 30.0; // 30 degrees translate to radians
+  const float MIN_DELTA_D = 0.5;
+  
+  // table constraints
+  const float DELTA_A_BOUND = MIN_DELTA_A + M_PI / 180.0 * 10.0;
+  const float DELTA_X_BOUND = MIN_DELTA_D + 0.1;
+  const float DELTA_Y_BOUND = MIN_DELTA_D + 0.1;
+  
+  const float DELTA_D_STEP = 0.05;
+  const float DELTA_A_STEP = M_PI / 180.0 * 5.0;
+
+  const size_t size_x = (size_t) round((DELTA_X_BOUND * 2.0) / DELTA_D_STEP) + 1;
+  const size_t size_y = (size_t) round((DELTA_Y_BOUND * 2.0) / DELTA_D_STEP) + 1;
+  const size_t size_a = (size_t) round((DELTA_A_BOUND * 2.0) / DELTA_A_STEP) + 1;
+  
+  float prob_motion[size_x][size_y][size_a];
+
+  const float k_EPSILON = 1e-4;
 };
 }  // namespace slam
 
