@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <array>
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
@@ -28,6 +29,7 @@
 #ifndef SRC_SLAM_H_
 #define SRC_SLAM_H_
 
+using namespace std;
 using std::round;
 
 namespace slam {
@@ -36,6 +38,7 @@ class SLAM {
  public:
   // Default Constructor.
   SLAM();
+  ~SLAM();
 
   // Observe a new laser scan.
   void ObserveLaser(const std::vector<float>& ranges,
@@ -67,18 +70,33 @@ class SLAM {
   const float MIN_DELTA_D = 0.5;
   
   // table constraints
-  const float DELTA_A_BOUND = MIN_DELTA_A + M_PI / 180.0 * 10.0;
-  const float DELTA_X_BOUND = MIN_DELTA_D + 0.1;
-  const float DELTA_Y_BOUND = MIN_DELTA_D + 0.1;
-  
   const float DELTA_D_STEP = 0.05;
   const float DELTA_A_STEP = M_PI / 180.0 * 5.0;
-
-  const size_t size_x = (size_t) round((DELTA_X_BOUND * 2.0) / DELTA_D_STEP) + 1;
-  const size_t size_y = (size_t) round((DELTA_Y_BOUND * 2.0) / DELTA_D_STEP) + 1;
-  const size_t size_a = (size_t) round((DELTA_A_BOUND * 2.0) / DELTA_A_STEP) + 1;
   
-  float prob_motion[size_x][size_y][size_a];
+  const float DELTA_A_BOUND = MIN_DELTA_A + 2 * DELTA_A_STEP;
+  const float DELTA_X_BOUND = MIN_DELTA_D + 2 * DELTA_D_STEP;
+  const float DELTA_Y_BOUND = MIN_DELTA_D + 2 * DELTA_D_STEP;
+
+  const size_t SIZE_X = (size_t) round((DELTA_X_BOUND * 2.0) / DELTA_D_STEP) + 1;
+  const size_t SIZE_Y = (size_t) round((DELTA_Y_BOUND * 2.0) / DELTA_D_STEP) + 1;
+  const size_t SIZE_A = (size_t) round((DELTA_A_BOUND * 2.0) / DELTA_A_STEP) + 1;
+  // float* prob_motion;
+  array<array<array<float, SIZE_A>, SIZE_Y>, SIZE_X> prob_motion;
+  // float prob_motion[SIZE_X][SIZE_Y][SIZE_A];
+
+  const float HORIZON = 10.0;
+  const float L_STEP = 0.05;
+  const size_t L_WIDTH = (size_t) round(2 * HORIZON / L_STEP) + 1;
+  const size_t L_HEIGHT = (size_t) round(2 * HORIZON / L_STEP) + 1;
+  array<array<float, L_WIDTH>, L_HEIGHT> prob_landmarks;
+  // float* prev_prob_landmarks;
+  // float prev_prob_landmarks[L_HEIGHT][L_WIDTH];
+  bool prev_landmarks_initialized;
+
+  const float S_RANGE = 1.0; 
+  const size_t MASK_SIZE = (size_t) round(2 * S_RANGE / L_STEP) + 1;
+  array<array<float, MASK_SIZE>, MASK_SIZE> prob_sensor;
+  // float prob_sensor[MASK_SIZE][MASK_SIZE];
 
   const float k_EPSILON = 1e-4;
 };

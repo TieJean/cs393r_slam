@@ -47,12 +47,13 @@ using std::swap;
 using std::vector;
 using vector_map::VectorMap;
 using std::abs;
+using std::vector;
 
 // CONFIG_FLOAT(GAMMA, "GAMMA");
-// CONFIG_FLOAT(SENSOR_STD_DEV, "SENSOR_STD_DEV");
-// CONFIG_FLOAT(D_SHORT, "D_SHORT");
-// CONFIG_FLOAT(D_LONG, "D_LONG");
-// CONFIG_FLOAT(P_OUTSIDE_RANGE, "P_OUTSIDE_RANGE");
+CONFIG_FLOAT(SENSOR_STD_DEV, "SENSOR_STD_DEV");
+CONFIG_FLOAT(D_SHORT, "D_SHORT");
+CONFIG_FLOAT(D_LONG, "D_LONG");
+CONFIG_FLOAT(P_OUTSIDE_RANGE, "P_OUTSIDE_RANGE");
 // CONFIG_FLOAT(MOTION_X_STD_DEV, "MOTION_X_STD_DEV");
 // CONFIG_FLOAT(MOTION_Y_STD_DEV, "MOTION_Y_STD_DEV");
 // CONFIG_FLOAT(MOTION_A_STD_DEV, "MOTION_A_STD_DEV");
@@ -84,20 +85,49 @@ SLAM::SLAM() :
     prev_pose_angle_(0),
     cur_pose_loc_(0, 0),
     cur_pose_angle_(0),
-    odom_initialized_(false) {
+    odom_initialized_(false),
+    prev_landmarks_initialized(false) {
+      
       // populates motion model table
-      for (size_t i = 0; i < prob_motion.length; i++) {
+      // prob_motion = (float*) malloc(sizeof(float) * SIZE_X * SIZE_Y * SIZE_A);
+      // *(prob_motion + i * (SIZE_X*SIZE_Y) + j*SIZE_Y + k)
+
+      // prob_motion = new float[SIZE_X][SIZE_Y][SIZE_A];
+      for (size_t i = 0; i < SIZE_X; i++) {
         float d_x = -DELTA_X_BOUND + i * DELTA_D_STEP;
-        for (size_t j = 0; i < prob_motion[0].length; j++) {
+        for (size_t j = 0; i < SIZE_Y; j++) {
           float d_y = -DELTA_Y_BOUND + i * DELTA_D_STEP;
-          for (size_t k = 0; k < prob_motion[0][0].length; k++) {
+          for (size_t k = 0; k < SIZE_A; k++) {
             float d_a = -DELTA_A_BOUND + k * DELTA_A_STEP;
             // calculate motion model probability
             prob_motion[i][j][k] = calculateMotionLikelihood(d_x, d_y, d_a);
           }
         }
       }
+
+      // populate the observation likelihood mask table
+      size_t idx_mean_x = MASK_SIZE / 2;
+      size_t idx_mean_y = MASK_SIZE / 2;
+      for (size_t i = 0; i < MASK_SIZE; ++i) {
+        for (size_t j = 0; j < MASK_SIZE; ++j) {
+          float x = sqrt( pow((idx_mean_x - i) * L_STEP, 2) + pow((idx_mean_y - j) * L_STEP, 2) );
+          if (x < -CONFIG_D_SHORT) {
+            prob_sensor[i][j] = - pow(CONFIG_D_SHORT, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
+          } else if (x > CONFIG_D_LONG) {
+            prob_sensor[i][j] = - pow(CONFIG_D_LONG, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
+          } else {
+            prob_sensor[i][j] = - pow(x, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
+          }
+        }
+      }
     }
+
+SLAM::~SLAM() {
+  // if (prob_motion != nullptr) {free(prob_motion);}
+  // delete [] prob_motion;
+  // if (prev_prob_landmarks != nullptr) {free(prev_prob_landmarks);}
+  // if (prob_sensor != nullptr) {free(prob_sensor)}
+}
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
@@ -118,15 +148,61 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
   if ( abs(cur_pose_angle_ - prev_pose_angle_) < MIN_DELTA_A && getDist(cur_pose_loc_, prev_pose_loc_) < MIN_DELTA_D ) {return;}
-
-  // TODO: 
-  // for each ray: (x', y') in the new laser frame
-  // transform (x', y') to the prev laser frame
   
-  // get p(s_{i+1}|x_i, x_{i+1}, s_i) from the lookup table
-  // calculate p(x_{i+1}|x_i, u_i) from lookup table (delta_x, delta_y, delta_theta)
-  // calculate && store current lookup tables
-  // calculate max{ p(s_{i+1}|x_i, x_{i+1}, s_i)p(x_{i+1}|x_i, u_i) }
+  if (prev_landmarks_initialized) {
+    
+    // TODO: calculations with the prev lookup table
+    
+    // TODO: 
+    // for each ray: (x', y') in the new laser frame
+    // transform (x', y') to the prev laser frame
+
+    // get p(s_{i+1}|x_i, x_{i+1}, s_i) from the lookup table
+    // calculate p(x_{i+1}|x_i, u_i) from lookup table (delta_x, delta_y, delta_theta)
+    // calculate && store current lookup tables
+    // calculate max{ p(s_{i+1}|x_i, x_{i+1}, s_i)p(x_{i+1}|x_i, u_i) }
+  }
+
+  // reset the lookup table
+  for (size_t i = 0; i < L_HEIGHT; ++i) {
+    for (size_t j = 0; j < L_WIDTH; ++j) {
+      prev_prob_landmarks[i][j] = k_EPSILON;
+    }
+  }
+
+  // fill the lookup table
+  float step_size = (angle_max - angle_min) / ranges.size();
+  for (int i = 0; i < ranges.size(); i++) {
+    float angle_i = angle_min + i * step_size;
+    float range_i = ranges[i];
+    if ( range_i > HORIZON - k_EPSILON  || range_i < range_min) {continue;}
+    
+    // get landmark position in laser frame
+    float lx = range_i * cos(angle_i);
+    float ly = range_i * sin(angle_i);
+    
+    size_t idx_x = (size_t) round((lx + HORIZON) / L_STEP);
+    size_t idx_y = (size_t) round((ly + HORIZON) / L_STEP);
+
+    size_t min_idx_x = idx_x - MASK_SIZE / 2;
+    min_idx_x = min_idx_x < 0 ? 0 : min_idx_x;
+    size_t max_idx_x = idx_x + MASK_SIZE / 2;
+    max_idx_x = max_idx_x > L_HEIGHT - 1 ? L_HEIGHT - 1 : max_idx_x;
+    size_t min_idx_y = idx_y - MASK_SIZE / 2;
+    min_idx_y = min_idx_y < 0 ? 0 : min_idx_y;
+    size_t max_idx_y = idx_y + MASK_SIZE / 2;
+    max_idx_y = max_idx_y > L_WIDTH - 1 ? L_WIDTH - 1 : max_idx_y;
+    
+    // fill in range around this laser reading
+    for (int x = min_idx_x; x <= max_idx_x; x+=L_STEP) {
+      for (int y = min_idx_y; y <= max_idx_y; y+=L_STEP) {
+        float p = prob_sensor[x - (idx_x - MASK_SIZE / 2)][y - (idx_y - MASK_SIZE / 2)];
+        prev_prob_landmarks[x][y] = p > prev_prob_landmarks[x][y] ? p : prev_prob_landmarks[x][y];
+      }
+    }
+  }
+  
+  prev_landmarks_initialized = true;
   
   prev_pose_angle_ = cur_pose_angle_;
   prev_pose_loc_ = cur_pose_loc_;
