@@ -29,6 +29,7 @@
 #include "shared/math/geometry.h"
 #include "shared/math/math_util.h"
 #include "shared/util/timer.h"
+#include "config_reader/config_reader.h"
 
 #include "slam.h"
 
@@ -66,26 +67,14 @@ CONFIG_FLOAT(MOTION_A_K2, "MOTION_A_K2");
 
 namespace slam {
 
-// returns the motion model log likelihood in a Gaussian distribution
-float calculateMotionLikelihood(float x, float y, float a) {
-  // assume the dimensions are independent
-  float d_d = sqrt(pow(x, 2) + pow(y, 2));
-  float d_stddev = CONFIG_MOTION_DIST_K1 * d_d + CONFIG_MOTION_DIST_K2 * abs(a) ; // TODO: fix me
-  float a_stddev = CONFIG_MOTION_A_K1 * d_d + CONFIG_MOTION_A_K2 * abs(a);
-  a_stddev = a_stddev > DELTA_A_BOUND ? DELTA_A_BOUND : a_stddev;
-
-  float log_x = - pow(x, 2) / pow(d_stddev, 2);
-  float log_y = - pow(y, 2) / pow(d_stddev, 2);
-  float log_a = - pow(a, 2) / pow(a_stddev, 2);
-  return log_x + log_y + log_a;
-}
+config_reader::ConfigReader config_reader_({"config/particle_filter.lua"});
 
 SLAM::SLAM() :
+    odom_initialized_(false), 
     prev_pose_loc_(0, 0),
     prev_pose_angle_(0),
     cur_pose_loc_(0, 0),
     cur_pose_angle_(0),
-    odom_initialized_(false),
     prev_landmarks_initialized(false) {
       
       // populates motion model table
@@ -129,14 +118,28 @@ SLAM::~SLAM() {
   // if (prob_sensor != nullptr) {free(prob_sensor)}
 }
 
+// returns the motion model log likelihood in a Gaussian distribution
+float SLAM::calculateMotionLikelihood(float x, float y, float a) {
+  // assume the dimensions are independent
+  float d_d = sqrt(pow(x, 2) + pow(y, 2));
+  float d_stddev = CONFIG_MOTION_DIST_K1 * d_d + CONFIG_MOTION_DIST_K2 * abs(a) ; // TODO: fix me
+  float a_stddev = CONFIG_MOTION_A_K1 * d_d + CONFIG_MOTION_A_K2 * abs(a);
+  a_stddev = a_stddev > DELTA_A_BOUND ? DELTA_A_BOUND : a_stddev;
+
+  float log_x = - pow(x, 2) / pow(d_stddev, 2);
+  float log_y = - pow(y, 2) / pow(d_stddev, 2);
+  float log_a = - pow(a, 2) / pow(a_stddev, 2);
+  return log_x + log_y + log_a;
+}
+
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = prev_pose_loc;
-  *angle = prev_odom_angle_;
+  *loc = prev_pose_loc_;
+  *angle = prev_pose_angle_;
 }
 
 float getDist(const Vector2f& odom, const Vector2f& prev_odom) {
-  return sqrt( pow(prev_odom.x() - odom.x(), 2) + pow(pre_odom.y() - odom.y()) );
+  return sqrt( pow(prev_odom.x() - odom.x(), 2) + pow(prev_odom.y() - odom.y(), 2) );
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -172,7 +175,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   // fill the lookup table
   float step_size = (angle_max - angle_min) / ranges.size();
-  for (int i = 0; i < ranges.size(); i++) {
+  for (size_t i = 0; i < ranges.size(); i++) {
     float angle_i = angle_min + i * step_size;
     float range_i = ranges[i];
     if ( range_i > HORIZON - k_EPSILON  || range_i < range_min) {continue;}
@@ -181,17 +184,17 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     float lx = range_i * cos(angle_i);
     float ly = range_i * sin(angle_i);
     
-    size_t idx_x = (size_t) round((lx + HORIZON) / L_STEP);
-    size_t idx_y = (size_t) round((ly + HORIZON) / L_STEP);
+    int idx_x = (int) round((lx + HORIZON) / L_STEP);
+    int idx_y = (int) round((ly + HORIZON) / L_STEP);
 
-    size_t min_idx_x = idx_x - MASK_SIZE / 2;
+    int min_idx_x = idx_x - MASK_SIZE / 2;
     min_idx_x = min_idx_x < 0 ? 0 : min_idx_x;
-    size_t max_idx_x = idx_x + MASK_SIZE / 2;
-    max_idx_x = max_idx_x > L_HEIGHT - 1 ? L_HEIGHT - 1 : max_idx_x;
-    size_t min_idx_y = idx_y - MASK_SIZE / 2;
+    int max_idx_x = idx_x + MASK_SIZE / 2;
+    max_idx_x = max_idx_x > (int) L_HEIGHT - 1 ? (int) L_HEIGHT - 1 : max_idx_x;
+    int min_idx_y = idx_y - MASK_SIZE / 2;
     min_idx_y = min_idx_y < 0 ? 0 : min_idx_y;
-    size_t max_idx_y = idx_y + MASK_SIZE / 2;
-    max_idx_y = max_idx_y > L_WIDTH - 1 ? L_WIDTH - 1 : max_idx_y;
+    int max_idx_y = idx_y + MASK_SIZE / 2;
+    max_idx_y = max_idx_y > (int) L_WIDTH - 1 ? (int) L_WIDTH - 1 : max_idx_y;
     
     // fill in range around this laser reading
     for (int x = min_idx_x; x <= max_idx_x; x+=L_STEP) {
@@ -210,8 +213,8 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_) {
-    prev_pose_angle = odom_angle;
-    prev_pose_loc = odom_loc;
+    prev_pose_angle_ = odom_angle;
+    prev_pose_loc_ = odom_loc;
     odom_initialized_ = true;
     return;
   }
