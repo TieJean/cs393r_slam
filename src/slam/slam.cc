@@ -49,6 +49,7 @@ using std::vector;
 using vector_map::VectorMap;
 using std::abs;
 using std::vector;
+using std::log;
 
 // CONFIG_FLOAT(GAMMA, "GAMMA");
 CONFIG_FLOAT(SENSOR_STD_DEV, "SENSOR_STD_DEV");
@@ -73,15 +74,12 @@ SLAM::SLAM() :
     odom_initialized_(false), 
     prev_pose_loc_(0, 0),
     prev_pose_angle_(0),
-    cur_pose_loc_(0, 0),
-    cur_pose_angle_(0),
+    cur_odom_loc_(0, 0),
+    cur_odom_angle_(0),
     prev_landmarks_initialized(false) {
       
       // populates motion model table
-      // prob_motion = (float*) malloc(sizeof(float) * SIZE_X * SIZE_Y * SIZE_A);
-      // *(prob_motion + i * (SIZE_X*SIZE_Y) + j*SIZE_Y + k)
-
-      // prob_motion = new float[SIZE_X][SIZE_Y][SIZE_A];
+      // TODO: optimize motion model: it's symmetric!
       for (size_t i = 0; i < SIZE_X; i++) {
         float d_x = -DELTA_X_BOUND + i * DELTA_D_STEP;
         for (size_t j = 0; i < SIZE_Y; j++) {
@@ -111,14 +109,7 @@ SLAM::SLAM() :
       }
     }
 
-SLAM::~SLAM() {
-  // if (prob_motion != nullptr) {free(prob_motion);}
-  // delete [] prob_motion;
-  // if (prev_prob_landmarks != nullptr) {free(prev_prob_landmarks);}
-  // if (prob_sensor != nullptr) {free(prob_sensor)}
-}
-
-// returns the motion model log likelihood in a Gaussian distribution
+// Returns the motion model log likelihood in a Gaussian distribution
 float SLAM::calculateMotionLikelihood(float x, float y, float a) {
   // assume the dimensions are independent
   float d_d = sqrt(pow(x, 2) + pow(y, 2));
@@ -142,6 +133,22 @@ float getDist(const Vector2f& odom, const Vector2f& prev_odom) {
   return sqrt( pow(prev_odom.x() - odom.x(), 2) + pow(prev_odom.y() - odom.y(), 2) );
 }
 
+/*
+ * loc_ab and angle_ab is the position of frame A in frame B.
+ * loc_pa and angle_pa is the position of the object p in frame A.
+ * Calculates the position of p in frame B.
+ */
+void TransformAToB(const Vector2f& loc_ab, float angle_ab,
+                   const Vector2f& loc_pa, float angle_pa,
+                   Vector2f* loc_ptr, float* angle_ptr) {
+  float& new_angle = *angle_ptr;
+  Vector2f& new_loc = *loc_ptr;
+  
+  Rotation2Df r(angle_ab);
+  new_loc = loc_ab + r * loc_pa;
+  new_angle = angle_ab + angle_pa;
+}
+
 void SLAM::ObserveLaser(const vector<float>& ranges,
                         float range_min,
                         float range_max,
@@ -150,30 +157,76 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
-  if ( abs(cur_pose_angle_ - prev_pose_angle_) < MIN_DELTA_A && getDist(cur_pose_loc_, prev_pose_loc_) < MIN_DELTA_D ) {return;}
+  if ( abs(cur_odom_angle_ - prev_pose_angle_) < MIN_DELTA_A && getDist(cur_odom_loc_, prev_pose_loc_) < MIN_DELTA_D ) {return;}
+  // TODO: check if we need to construct map on the initial pose
   
   if (prev_landmarks_initialized) {
-    
-    // TODO: calculations with the prev lookup table
-    
-    // TODO: 
-    // for each ray: (x', y') in the new laser frame
-    // transform (x', y') to the prev laser frame
+    float max_p = log(0.1*k_EPSILON);
+    float max_p_dx = 0.0;
+    float max_p_dy = 0.0;
+    float max_p_da = 0.0;
+  
+    // check all possible poses of the car
+    for (float delta_x = -DELTA_X_BOUND; delta_x < DELTA_X_BOUND; delta_x += DELTA_D_STEP) {
+      for (float delta_y = -DELTA_Y_BOUND; delta_y < DELTA_Y_BOUND; delta_y += DELTA_D_STEP) {
+        for (float delta_a = -DELTA_A_BOUND; delta_a < DELTA_A_BOUND; delta_a += DELTA_A_STEP) {
+          Vector2f loc_ab(delta_x, delta_y);
+          float angle_ab = delta_a;
 
-    // get p(s_{i+1}|x_i, x_{i+1}, s_i) from the lookup table
-    // calculate p(x_{i+1}|x_i, u_i) from lookup table (delta_x, delta_y, delta_theta)
-    // calculate && store current lookup tables
-    // calculate max{ p(s_{i+1}|x_i, x_{i+1}, s_i)p(x_{i+1}|x_i, u_i) }
+          // calculate p(x_{i+1}|x_i, u_i) from motion lookup table
+          size_t motion_idx_x = (size_t) round((delta_x + DELTA_X_BOUND) / DELTA_D_STEP);
+          size_t motion_idx_y = (size_t) round((delta_y + DELTA_Y_BOUND) / DELTA_D_STEP);
+          size_t motion_idx_a = (size_t) round((delta_a + DELTA_A_BOUND) / DELTA_D_STEP);
+          float p_motion = prob_motion[motion_idx_x][motion_idx_y][motion_idx_a];
+
+          // check all observations by using the lookup table from prev pose
+          // TODO: Try to reduce duplicate calculations here if slow
+          float step_size = (angle_max - angle_min) / ranges.size();
+          for (size_t i = 0; i < ranges.size(); i++) {
+            float angle_i = angle_min + i * step_size;
+            float range_i = ranges[i];
+            if ( range_i > HORIZON - k_EPSILON  || range_i < range_min) {continue;}
+
+            // get landmark position in the new laser frame
+            Vector2f loc_pa(range_i * cos(angle_i), range_i * sin(angle_i));
+            float angle_pa = angle_i;
+            
+            // transform each ray in the new laser frame to the prev laser frame
+            Vector2f transformed_lloc(0,0);
+            float transformed_langle = 0.0;
+            TransformAToB(loc_ab, angle_ab, loc_pa, angle_pa, &transformed_lloc, &transformed_langle);
+            
+            // get p(s_{i+1}|x_i, x_{i+1}, s_i) from the lookup table
+            size_t landmark_idx_x = (size_t) round((transformed_lloc.x() + HORIZON) / L_STEP);
+            size_t landmark_idx_y = (size_t) round((transformed_lloc.y() + HORIZON) / L_STEP);
+            float p_landmark = prev_prob_landmarks[landmark_idx_x][landmark_idx_y];
+            
+            // calculate p(s_{i+1}|x_i, x_{i+1}, s_i)p(x_{i+1}|x_i, u_i)
+            float prob = p_motion + p_landmark;
+            if (prob > max_p) {
+              max_p = prob;
+              max_p_dx = delta_x;
+              max_p_dy = delta_y;
+              max_p_da = delta_a;
+            }
+          }
+        }
+      }
+    }
+    prev_pose_angle_ += max_p_da;
+    prev_pose_loc_ += Vector2f(max_p_dx, max_p_dy);
   }
+
+  prev_landmarks_initialized = true;
 
   // reset the lookup table
   for (size_t i = 0; i < L_HEIGHT; ++i) {
     for (size_t j = 0; j < L_WIDTH; ++j) {
-      prev_prob_landmarks[i][j] = k_EPSILON;
+      prev_prob_landmarks[i][j] = log(k_EPSILON);
     }
   }
 
-  // fill the lookup table
+  // fill the lookup table using current observations
   float step_size = (angle_max - angle_min) / ranges.size();
   for (size_t i = 0; i < ranges.size(); i++) {
     float angle_i = angle_min + i * step_size;
@@ -203,12 +256,14 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
         prev_prob_landmarks[x][y] = p > prev_prob_landmarks[x][y] ? p : prev_prob_landmarks[x][y];
       }
     }
+
+    // add the laser scan to the map, after transforming back to the initial pose
+    Vector2f kLandmark = Vector2f(lx, ly) + kLaserLoc;
+    Rotation2Df r(-prev_pose_angle_);
+    Vector2f mLandmark = r * kLandmark - prev_pose_loc_;
+    map_.push_back(mLandmark);
   }
   
-  prev_landmarks_initialized = true;
-  
-  prev_pose_angle_ = cur_pose_angle_;
-  prev_pose_loc_ = cur_pose_loc_;
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
@@ -220,15 +275,15 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   }
   // Keep track of odometry to estimate how far the robot has moved between 
   // poses.
-  cur_pose_angle_ = odom_angle;
-  cur_pose_loc_ = odom_loc;
+  cur_odom_angle_ = odom_angle;
+  cur_odom_loc_ = odom_loc;
 }
 
 vector<Vector2f> SLAM::GetMap() {
-  vector<Vector2f> map;
+  
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
-  return map;
+  return map_;
 }
 
 }  // namespace slam
