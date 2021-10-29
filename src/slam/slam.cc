@@ -51,20 +51,14 @@ using std::abs;
 using std::vector;
 using std::log;
 
-// CONFIG_FLOAT(GAMMA, "GAMMA");
 CONFIG_FLOAT(SENSOR_STD_DEV, "SENSOR_STD_DEV");
 CONFIG_FLOAT(D_SHORT, "D_SHORT");
 CONFIG_FLOAT(D_LONG, "D_LONG");
 CONFIG_FLOAT(P_OUTSIDE_RANGE, "P_OUTSIDE_RANGE");
-// CONFIG_FLOAT(MOTION_X_STD_DEV, "MOTION_X_STD_DEV");
-// CONFIG_FLOAT(MOTION_Y_STD_DEV, "MOTION_Y_STD_DEV");
-// CONFIG_FLOAT(MOTION_A_STD_DEV, "MOTION_A_STD_DEV");
 CONFIG_FLOAT(MOTION_DIST_K1, "MOTION_DIST_K1");
 CONFIG_FLOAT(MOTION_DIST_K2, "MOTION_DIST_K2");
 CONFIG_FLOAT(MOTION_A_K1, "MOTION_A_K1");
 CONFIG_FLOAT(MOTION_A_K2, "MOTION_A_K2");
-// CONFIG_FLOAT(MAX_D_DIST, "MAX_D_DIST");
-// CONFIG_FLOAT(MAX_D_ANGLE, "MAX_D_ANGLE");
 
 namespace slam {
 
@@ -77,21 +71,42 @@ SLAM::SLAM() :
     cur_odom_loc_(0, 0),
     cur_odom_angle_(0),
     prev_landmarks_initialized(false) {
-      
+      cout << "Start of constructor" << endl;
+
+      // allocates space for all three lookup tables
+      prev_prob_landmarks = new float*[L_HEIGHT];
+      for (size_t i = 0; i < L_HEIGHT; ++i) {
+        prev_prob_landmarks[i] = new float[L_WIDTH];
+      }
+      prob_sensor = new float*[MASK_SIZE];
+      for (size_t i = 0; i < MASK_SIZE; ++i) {
+        prob_sensor[i] = new float[MASK_SIZE];
+      }
+      prob_motion = new float**[SIZE_X];
+      for (size_t i = 0; i < SIZE_X; ++i) {
+        prob_motion[i] = new float*[SIZE_Y];
+        for (size_t j = 0; j < SIZE_Y; ++j) {
+          prob_motion[i][j] = new float[SIZE_A];
+        }
+      }
       // populates motion model table
       // TODO: optimize motion model: it's symmetric!
+      // prob_motion = new float[SIZE_X][SIZE_Y][SIZE_A];
       for (size_t i = 0; i < SIZE_X; i++) {
         float d_x = -DELTA_X_BOUND + i * DELTA_D_STEP;
-        for (size_t j = 0; i < SIZE_Y; j++) {
+        for (size_t j = 0; j < SIZE_Y; j++) {
           float d_y = -DELTA_Y_BOUND + i * DELTA_D_STEP;
           for (size_t k = 0; k < SIZE_A; k++) {
             float d_a = -DELTA_A_BOUND + k * DELTA_A_STEP;
             // calculate motion model probability
+            cout << i << j << k << endl;
             prob_motion[i][j][k] = calculateMotionLikelihood(d_x, d_y, d_a);
           }
         }
       }
 
+      cout << "adding observation likeilhood table" << endl;
+      // prob_sensor = new float[MASK_SIZE][MASK_SIZE];
       // populate the observation likelihood mask table
       size_t idx_mean_x = MASK_SIZE / 2;
       size_t idx_mean_y = MASK_SIZE / 2;
@@ -107,7 +122,29 @@ SLAM::SLAM() :
           }
         }
       }
+    cout << "end of constructor" << endl;
     }
+
+SLAM::~SLAM() {
+  for (size_t i = 0; i < L_HEIGHT; ++i) {
+    delete[] prev_prob_landmarks[i];
+  }
+  delete[] prev_prob_landmarks;
+
+  for (size_t i = 0; i < SIZE_X; ++i) {
+    for (size_t j = 0; j < SIZE_Y; ++j) {
+      delete[] prob_motion[i][j];
+    }
+    delete[] prob_motion[i];
+  }
+  delete[] prob_motion;
+
+  for (size_t i = 0; i < MASK_SIZE; ++i) {
+    delete[] prob_sensor[i];
+  }
+  delete[] prob_sensor;
+
+}
 
 // Returns the motion model log likelihood in a Gaussian distribution
 float SLAM::calculateMotionLikelihood(float x, float y, float a) {
@@ -120,6 +157,7 @@ float SLAM::calculateMotionLikelihood(float x, float y, float a) {
   float log_x = - pow(x, 2) / pow(d_stddev, 2);
   float log_y = - pow(y, 2) / pow(d_stddev, 2);
   float log_a = - pow(a, 2) / pow(a_stddev, 2);
+  cout << "End of motion likehood calc" << endl;
   return log_x + log_y + log_a;
 }
 
@@ -283,6 +321,7 @@ vector<Vector2f> SLAM::GetMap() {
   
   // Reconstruct the map as a single aligned point cloud from all saved poses
   // and their respective scans.
+  // cout << map_.size() << endl;
   return map_;
 }
 

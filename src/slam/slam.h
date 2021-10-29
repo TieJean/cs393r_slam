@@ -39,6 +39,7 @@ class SLAM {
  public:
   // Default Constructor.
   SLAM();
+  ~SLAM();
 
   // Observe a new laser scan.
   void ObserveLaser(const std::vector<float>& ranges,
@@ -82,19 +83,21 @@ class SLAM {
   constexpr static size_t SIZE_X = (size_t) ((DELTA_X_BOUND * 2.0) / DELTA_D_STEP) + 1;
   constexpr static size_t SIZE_Y = (size_t) ((DELTA_Y_BOUND * 2.0) / DELTA_D_STEP) + 1;
   constexpr static size_t SIZE_A = (size_t) ((DELTA_A_BOUND * 2.0) / DELTA_A_STEP) + 1;
-  float prob_motion[SIZE_X][SIZE_Y][SIZE_A];
+  // float prob_motion[SIZE_X][SIZE_Y][SIZE_A];
+  float*** prob_motion;
 
   constexpr static float HORIZON = 10.0;
   constexpr static float L_STEP = 0.05;
   constexpr static size_t L_WIDTH = (size_t) (2 * HORIZON / L_STEP) + 1;
   constexpr static size_t L_HEIGHT = (size_t) (2 * HORIZON / L_STEP) + 1;
-  float prev_prob_landmarks[L_HEIGHT][L_WIDTH];
+  float** prev_prob_landmarks;
+  // float prev_prob_landmarks[L_HEIGHT][L_WIDTH];
   bool prev_landmarks_initialized;
 
   constexpr static float S_RANGE = 1.0; 
   constexpr static size_t MASK_SIZE = (size_t) (2 * S_RANGE / L_STEP) + 1;
-  float prob_sensor[MASK_SIZE][MASK_SIZE];
-
+  // float prob_sensor[MASK_SIZE][MASK_SIZE] = {};
+  float** prob_sensor;
   const float k_EPSILON = 1e-4;
   // const int DOWNSAMPLE_RATE = 10;
   const Vector2f kLaserLoc = Vector2f(0.2, 0);

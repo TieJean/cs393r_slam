@@ -98,6 +98,7 @@ void PublishMap() {
   ClearVisualizationMsg(vis_msg_);
 
   const vector<Vector2f> map = slam_.GetMap();
+  // cout << "publish map" << endl;
   printf("Map: %lu points\n", map.size());
   for (const Vector2f& p : map) {
     visualization::DrawPoint(p, 0xC0C0C0, vis_msg_);
@@ -127,6 +128,7 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
       msg.range_max,
       msg.angle_min,
       msg.angle_max);
+  // cout << "HELLO" << endl;
   PublishMap();
   PublishPose();
 }
@@ -153,7 +155,7 @@ int main(int argc, char** argv) {
       n.advertise<VisualizationMsg>("visualization", 1);
   localization_publisher_ =
       n.advertise<amrl_msgs::Localization2DMsg>("localization", 1);
-
+  // cout << "before laserCallback" << endl;
   ros::Subscriber laser_sub = n.subscribe(
       FLAGS_laser_topic.c_str(),
       1,
