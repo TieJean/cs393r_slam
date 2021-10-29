@@ -60,6 +60,7 @@ class SLAM {
 
  private:
   float calculateMotionLikelihood(float x, float y, float a);
+  void init();
 
   // Previous odometry-reported locations.
   bool odom_initialized_;
@@ -67,6 +68,8 @@ class SLAM {
   float prev_pose_angle_;
   Eigen::Vector2f cur_odom_loc_;
   float cur_odom_angle_;
+  Eigen::Vector2f init_pose_loc_;
+  float init_pose_angle_;
   
   // pose constraints
   constexpr static float MIN_DELTA_A = M_PI / 180.0 * 30.0; // 30 degrees translate to radians
