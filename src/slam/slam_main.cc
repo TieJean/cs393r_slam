@@ -97,7 +97,7 @@ void PublishMap() {
   vis_msg_.header.stamp = ros::Time::now();
   ClearVisualizationMsg(vis_msg_);
   const vector<Vector2f> map = slam_.GetMap();
-  printf("Map: %lu points\n", map.size());
+  // printf("Map: %lu points\n", map.size());
   for (const Vector2f& p : map) {
     visualization::DrawPoint(p, 0xC0C0C0, vis_msg_);
   }
