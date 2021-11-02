@@ -120,12 +120,8 @@ void SLAM::init() {
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = prev_pose_loc_ - init_pose_loc_;
-  // *loc = prev_pose_loc_;
+  *loc = prev_pose_loc_;
   *angle = prev_pose_angle_;
-  // *angle = prev_pose_angle_ - init_pose_angle_;
-  // *angle = *angle >  M_PI ? *angle - 2 * M_PI : *angle;
-  // *angle = *angle < -M_PI ? *angle + 2 * M_PI : *angle;
 }
 
 float getDist(const Vector2f& odom, const Vector2f& prev_odom) {
@@ -282,11 +278,8 @@ void SLAM::UpdatePose(const vector<float>& ranges,
 
 void SLAM::ReconstructMap(float lx, float ly) {
   Vector2f kLandmark = Vector2f(lx, ly) + kLaserLoc;
-  // Rotation2Df r(init_pose_angle_ - prev_pose_angle_);
-  // Vector2f mLandmark = r * kLandmark + prev_pose_loc_ - init_pose_loc_;
-  // Vector2f mLandmark = transformCurrToPrev(prev_pose_loc_, prev_pose_angle_, init_pose_loc_, init_pose_angle_, kLandmark);
-  Vector2f mLandmark = transformCurrToPrev(prev_pose_loc_, prev_pose_angle_, init_pose_loc_, 0, kLandmark);
-  // Vector2f mLandmark = transformCurrToPrev(init_pose_loc_, init_pose_angle_, prev_pose_loc_, prev_pose_angle_, kLandmark);
+  Rotation2Df r(prev_pose_angle_);
+  Vector2f mLandmark = r * kLandmark + prev_pose_loc_;
   map_.push_back(mLandmark);
 }
 
@@ -381,16 +374,17 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
     init();
     init_pose_loc_ = odom_loc;
     init_pose_angle_ = odom_angle;
-    prev_pose_angle_ = odom_angle;
-    prev_pose_loc_ = odom_loc;
+    prev_pose_angle_ = 0;
+    prev_pose_loc_ = Vector2f(0, 0);
     odom_initialized_ = true;
     cout << "init loc: (" << init_pose_loc_.x() << ", " << init_pose_loc_.y() << ") ";
     cout << "init angle: " << init_pose_angle_ << endl;
   }
   // Keep track of odometry to estimate how far the robot has moved between 
   // poses.
-  cur_odom_angle_ = odom_angle;
-  cur_odom_loc_ = odom_loc;
+  Rotation2Df r(-init_pose_angle_);
+  cur_odom_angle_ = odom_angle - init_pose_angle_;
+  cur_odom_loc_ = r * (odom_loc - init_pose_loc_);
 }
 
 vector<Vector2f> SLAM::GetMap() {
