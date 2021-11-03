@@ -100,7 +100,6 @@ SLAM::~SLAM() {
 void SLAM::init() {  
   // map_.clear();
 
-  // prob_sensor = new float[MASK_SIZE][MASK_SIZE];
   // populate the observation likelihood mask table
   size_t idx_mean_x = MASK_SIZE / 2;
   size_t idx_mean_y = MASK_SIZE / 2;
@@ -201,11 +200,11 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
 
     // get landmark position in the new laser frame
     Vector2f lloc(range_i * cos(angle_i), range_i * sin(angle_i));
-    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), cur_odom_angle_ + noise_a,
-    //                                                 prev_pose_loc_, prev_pose_angle_, lloc);
-    Vector2f transformed_lloc = transformCurrToPrev(Vector2f( cur_odom_loc_.x() + noise_x, -cur_odom_loc_.y() - noise_y), -cur_odom_angle_ - noise_a, 
-                                                    prev_pose_loc_, prev_pose_angle_,
-                                                    lloc);
+    Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), cur_odom_angle_ + noise_a,
+                                                    prev_pose_loc_, prev_pose_angle_, lloc);
+    // Vector2f transformed_lloc = transformCurrToPrev(Vector2f( cur_odom_loc_.x() + noise_x, -cur_odom_loc_.y() - noise_y), -cur_odom_angle_ - noise_a, 
+    //                                                 prev_pose_loc_, prev_pose_angle_,
+    //                                                 lloc);
     // Vector2f transformed_lloc = transformCurrToPrev(prev_pose_loc_, prev_pose_angle_,
     //                                                 Vector2f( cur_odom_loc_.x() + noise_x, -cur_odom_loc_.y() - noise_y), cur_odom_angle_ + noise_a, 
     //                                                 lloc);
@@ -231,8 +230,6 @@ void SLAM::UpdatePose(const vector<float>& ranges,
   if (!prev_landmarks_initialized) {
     // getting first pose
     map_.clear();
-    cout << "prev: (" << prev_pose_loc_.x() << ", " << prev_pose_loc_.y() << ") " << prev_pose_angle_ << endl;
-    cout << "curr: (" << cur_odom_loc_.x() << ", " << cur_odom_loc_.y() << ") " << cur_odom_angle_ << endl;
     prev_pose_angle_ = cur_odom_angle_;
     prev_pose_loc_ = cur_odom_loc_;
     return;
@@ -249,11 +246,11 @@ void SLAM::UpdatePose(const vector<float>& ranges,
   for (float noise_x = -NOISE_X_BOUND; noise_x < NOISE_X_BOUND; noise_x += NOISE_D_STEP) {
     for (float noise_y = -NOISE_Y_BOUND; noise_y < NOISE_Y_BOUND; noise_y += NOISE_D_STEP) {
       for (float noise_a = -NOISE_A_BOUND; noise_a < NOISE_A_BOUND; noise_a += NOISE_A_STEP) {
-        float p_motion = GetMotionLikelihood(noise_x, noise_y, noise_a);
+        // float p_motion = GetMotionLikelihood(noise_x, noise_y, noise_a);
         float p_landmark = GetObservationLikelihood(ranges, range_min, range_max, angle_min,
                                                     angle_max, noise_x, noise_y, noise_a);
-        float prob = p_motion + CONFIG_GAMMA * p_landmark;
-        // float prob = p_landmark;
+        // float prob = p_motion + CONFIG_GAMMA * p_landmark;
+        float prob = p_landmark;
         if (prob > max_p) {
           max_p = prob;
           max_p_dx = noise_x;
@@ -353,19 +350,19 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // cout << "prev angle: " << prev_pose_angle_ << endl;
   // cout << "curr loc: (" << cur_odom_loc_.x() << ", " << cur_odom_loc_.y() << ") ";
   // cout << "curr angle: " << cur_odom_angle_ << endl;
-  cout << "before: (" << cur_odom_loc_.x() - prev_pose_loc_.x() << ", " << cur_odom_loc_.y() - prev_pose_loc_.y() << ") ";
-  cout << cur_odom_angle_ - prev_pose_angle_ << endl;
-  float temp_x = prev_pose_loc_.x();
-  float temp_y = prev_pose_loc_.y();
-  float temp_a = prev_pose_angle_;
+  // cout << "before: (" << cur_odom_loc_.x() - prev_pose_loc_.x() << ", " << cur_odom_loc_.y() - prev_pose_loc_.y() << ") ";
+  // cout << cur_odom_angle_ - prev_pose_angle_ << endl;
+  // float temp_x = prev_pose_loc_.x();
+  // float temp_y = prev_pose_loc_.y();
+  // float temp_a = prev_pose_angle_;
 
   UpdatePose(ranges, range_min, range_max, angle_min, angle_max);
   prev_landmarks_initialized = true;
 
   UpdateLookupTable(ranges, range_min, range_max, angle_min, angle_max);
 
-  cout << "after: (" << prev_pose_loc_.x() - temp_x << ", " << prev_pose_loc_.y() - temp_y << ") ";
-  cout << prev_pose_angle_ - temp_a << endl;
+  // cout << "after: (" << prev_pose_loc_.x() - temp_x << ", " << prev_pose_loc_.y() - temp_y << ") ";
+  // cout << prev_pose_angle_ - temp_a << endl;
   // cout << "End of ObserveLaser" << endl;
 }
 

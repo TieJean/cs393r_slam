@@ -100,7 +100,7 @@ class SLAM {
   constexpr static float NOISE_A_STEP = M_PI / 180.0 * 5.0;
   
   constexpr static float NOISE_X_BOUND = 0.5;
-  constexpr static float NOISE_Y_BOUND = 0.5 ;
+  constexpr static float NOISE_Y_BOUND = 0.5;
   constexpr static float NOISE_A_BOUND = M_PI / 180.0 * 30.0;
 
   constexpr static float HORIZON = 10.0;
