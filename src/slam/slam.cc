@@ -106,13 +106,18 @@ void SLAM::init() {
   for (size_t i = 0; i < MASK_SIZE; ++i) {
     for (size_t j = 0; j < MASK_SIZE; ++j) {
       float x = sqrt( pow((idx_mean_x - i) * L_STEP, 2) + pow((idx_mean_y - j) * L_STEP, 2) );
-      if (x < -CONFIG_D_SHORT) {
-        prob_sensor[i][j] = - pow(CONFIG_D_SHORT, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
-      } else if (x > CONFIG_D_LONG) {
+      if (x > CONFIG_D_LONG) {
         prob_sensor[i][j] = - pow(CONFIG_D_LONG, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
       } else {
         prob_sensor[i][j] = - pow(x, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
       }
+      // if (x < -CONFIG_D_SHORT) {
+      //   prob_sensor[i][j] = - pow(CONFIG_D_SHORT, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
+      // } else if (x > CONFIG_D_LONG) {
+      //   prob_sensor[i][j] = - pow(CONFIG_D_LONG, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
+      // } else {
+      //   prob_sensor[i][j] = - pow(x, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
+      // }
     }
   } 
 }
@@ -200,11 +205,19 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
 
     // get landmark position in the new laser frame
     Vector2f lloc(range_i * cos(angle_i), range_i * sin(angle_i));
-    Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), cur_odom_angle_ + noise_a,
+
+    // makes sense but doesn't look good
+    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y),
+    //                                                 subtractAngles(cur_odom_angle_, -noise_a),
+    //                                                 prev_pose_loc_, prev_pose_angle_, lloc);
+    
+    // good at hard turn, looks the nicest without shifting, alternates direction though
+    Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), -cur_odom_angle_ - noise_a, 
                                                     prev_pose_loc_, prev_pose_angle_, lloc);
-    // Vector2f transformed_lloc = transformCurrToPrev(Vector2f( cur_odom_loc_.x() + noise_x, -cur_odom_loc_.y() - noise_y), -cur_odom_angle_ - noise_a, 
-    //                                                 prev_pose_loc_, prev_pose_angle_,
-    //                                                 lloc);
+    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y), cur_odom_angle_ + noise_a, 
+    //                                                 prev_pose_loc_, -prev_pose_angle_, lloc);
+    
+    
     // Vector2f transformed_lloc = transformCurrToPrev(prev_pose_loc_, prev_pose_angle_,
     //                                                 Vector2f( cur_odom_loc_.x() + noise_x, -cur_odom_loc_.y() - noise_y), cur_odom_angle_ + noise_a, 
     //                                                 lloc);
@@ -270,7 +283,8 @@ void SLAM::UpdatePose(const vector<float>& ranges,
   // cout << ", " << cur_odom_loc_.y() - prev_pose_loc_.y();
   // cout << ") " << cur_odom_angle_ - prev_pose_angle_ << endl;
   prev_pose_angle_ = subtractAngles(cur_odom_angle_, -max_p_da);
-  prev_pose_loc_ = cur_odom_loc_ + Vector2f(max_p_dx, max_p_dy);
+  Rotation2Df r(cur_odom_angle_);
+  prev_pose_loc_ = cur_odom_loc_ + r * Vector2f(max_p_dx, max_p_dy);
 }
 
 void SLAM::ReconstructMap(float lx, float ly) {
