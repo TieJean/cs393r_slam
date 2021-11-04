@@ -120,6 +120,8 @@ class SLAM {
   const int DOWNSAMPLE_RATE = 20;
   const Vector2f kLaserLoc = Vector2f(0.2, 0);
   vector<Vector2f> map_;
+
+  size_t n_log;
 };
 }  // namespace slam
 

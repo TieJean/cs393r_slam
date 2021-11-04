@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <string> 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
 #include "gflags/gflags.h"
@@ -81,6 +83,7 @@ SLAM::SLAM() :
       for (size_t i = 0; i < MASK_SIZE; ++i) {
         prob_sensor[i] = new float[MASK_SIZE];
       }
+      n_log = 0;
     }
 
 SLAM::~SLAM() {
@@ -101,16 +104,20 @@ void SLAM::init() {
   // map_.clear();
 
   // populate the observation likelihood mask table
+  // ofstream fd("./logs/prob_sensor.csv");
   size_t idx_mean_x = MASK_SIZE / 2;
   size_t idx_mean_y = MASK_SIZE / 2;
+  // cout << "**************table*************" << endl;
   for (size_t i = 0; i < MASK_SIZE; ++i) {
     for (size_t j = 0; j < MASK_SIZE; ++j) {
-      float x = sqrt( pow((idx_mean_x - i) * L_STEP, 2) + pow((idx_mean_y - j) * L_STEP, 2) );
+      float x = sqrt( pow(((int)idx_mean_x - (int)i) * L_STEP, 2) + pow(((int)idx_mean_y - (int)j) * L_STEP, 2) );
       if (x > CONFIG_D_LONG) {
         prob_sensor[i][j] = - pow(CONFIG_D_LONG, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
       } else {
         prob_sensor[i][j] = - pow(x, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
       }
+      // printf("%.2f, ", prob_sensor[i][j]);
+      // cout << prob_sensor[i][j] << ",";
       // if (x < -CONFIG_D_SHORT) {
       //   prob_sensor[i][j] = - pow(CONFIG_D_SHORT, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
       // } else if (x > CONFIG_D_LONG) {
@@ -118,8 +125,11 @@ void SLAM::init() {
       // } else {
       //   prob_sensor[i][j] = - pow(x, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
       // }
+
     }
-  } 
+    // cout << endl;
+  }
+  // cout << "--------------end-------------" << endl;
 }
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
@@ -207,13 +217,13 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
     Vector2f lloc(range_i * cos(angle_i), range_i * sin(angle_i));
 
     // makes sense but doesn't look good
-    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y),
-    //                                                 subtractAngles(cur_odom_angle_, -noise_a),
-    //                                                 prev_pose_loc_, prev_pose_angle_, lloc);
+    Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y),
+                                                    subtractAngles(cur_odom_angle_, -noise_a),
+                                                    prev_pose_loc_, prev_pose_angle_, lloc);
     
     // good at hard turn, looks the nicest without shifting, alternates direction though
-    Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), -cur_odom_angle_ - noise_a, 
-                                                    prev_pose_loc_, prev_pose_angle_, lloc);
+    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), -cur_odom_angle_ - noise_a, 
+    //                                                 prev_pose_loc_, prev_pose_angle_, lloc);
     // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y), cur_odom_angle_ + noise_a, 
     //                                                 prev_pose_loc_, -prev_pose_angle_, lloc);
     
@@ -229,9 +239,11 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
     
     size_t landmark_idx_x = (size_t) round((transformed_lloc.x() + HORIZON) / L_STEP);
     size_t landmark_idx_y = (size_t) round((transformed_lloc.y() + HORIZON) / L_STEP);
+    // cout << prev_prob_landmarks[landmark_idx_x][landmark_idx_y] << ", ";
     
     p_landmark += prev_prob_landmarks[landmark_idx_x][landmark_idx_y];
   }
+  // cout << end;
   return p_landmark;
 }
 
@@ -300,11 +312,31 @@ void SLAM::UpdateLookupTable(const vector<float>& ranges,
                              float angle_min,
                              float angle_max) {
   // reset the lookup table
+  // cout << "*****************lookup table**************" << endl;
   for (size_t i = 0; i < L_HEIGHT; ++i) {
     for (size_t j = 0; j < L_WIDTH; ++j) {
+      // printf("%4f, ", prev_prob_landmarks[i][j]);
       prev_prob_landmarks[i][j] = MIN_LOG_PROB;
     }
   }
+
+  // ofstream fd("./logs/" + std::to_string(n_log) + ".csv");
+  // // fd.open("../logs/" + std::to_string(n_log) + ".csv", ios::out);
+  // if (fd.is_open()) {
+  //   for (size_t i = 0; i < L_HEIGHT; ++i) {
+  //     for (size_t j = 0; j < L_WIDTH; ++j) {
+  //       fd << prev_prob_landmarks[i][j] << ",";
+  //       // printf("%4f, ", prev_prob_landmarks[i][j]);
+  //       prev_prob_landmarks[i][j] = MIN_LOG_PROB;
+  //     }
+  //     fd << endl;
+  //   } 
+  // } else {
+  //   perror("error opening file!");
+  // }
+  // fd.close();
+  // ++n_log;
+  
 
   // fill the lookup table using current observations
   float step_size = (angle_max - angle_min) / ranges.size();
@@ -329,11 +361,15 @@ void SLAM::UpdateLookupTable(const vector<float>& ranges,
     min_idx_y = min_idx_y < 0 ? 0 : min_idx_y;
     int max_idx_y = idx_y + MASK_SIZE / 2;
     max_idx_y = max_idx_y > (int) L_WIDTH - 1 ? (int) L_WIDTH - 1 : max_idx_y;
+
+    // cout << "min_x: " << min_idx_x << " max_x: " << max_idx_x;
+    // cout << "min_y: " << min_idx_y << " max_y: " << max_idx_y << endl;
     
     // fill in range around this laser reading
     for (int x = min_idx_x; x <= max_idx_x; ++x) {
       for (int y = min_idx_y; y <= max_idx_y; ++y) {
-        float p = prob_sensor[x - (idx_x - MASK_SIZE / 2)][y - (idx_y - MASK_SIZE / 2)];
+        float p = prob_sensor[x - min_idx_x][y - min_idx_y];
+        // float p = prob_sensor[x - (idx_x - MASK_SIZE / 2)][y - (idx_y - MASK_SIZE / 2)];
         prev_prob_landmarks[x][y] = p > prev_prob_landmarks[x][y] ? p : prev_prob_landmarks[x][y];
       }
     }

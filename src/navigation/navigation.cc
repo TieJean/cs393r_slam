@@ -400,7 +400,9 @@ namespace navigation
     if (!odom_initialized_)
       return;
 
-    makeControlDecision();
+    // makeControlDecision();
+    drive_msg_.curvature = 0.0;
+    drive_msg_.velocity = 0.0;
 
     // Add timestamps to all messages.
     local_viz_msg_.header.stamp = ros::Time::now();
