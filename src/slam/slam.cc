@@ -105,7 +105,7 @@ void SLAM::init() {
   size_t idx_mean_y = MASK_SIZE / 2;
   for (size_t i = 0; i < MASK_SIZE; ++i) {
     for (size_t j = 0; j < MASK_SIZE; ++j) {
-      float x = sqrt( pow((idx_mean_x - i) * L_STEP, 2) + pow((idx_mean_y - j) * L_STEP, 2) );
+      float x = sqrt( pow(((int)idx_mean_x - (int)i) * L_STEP, 2) + pow(((int)idx_mean_y - (int)j) * L_STEP, 2) );
       if (x > CONFIG_D_LONG) {
         prob_sensor[i][j] = - pow(CONFIG_D_LONG, 2) / pow(CONFIG_SENSOR_STD_DEV, 2);
       } else {
@@ -207,13 +207,13 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
     Vector2f lloc(range_i * cos(angle_i), range_i * sin(angle_i));
 
     // makes sense but doesn't look good
-    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y),
-    //                                                 subtractAngles(cur_odom_angle_, -noise_a),
-    //                                                 prev_pose_loc_, prev_pose_angle_, lloc);
+    Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y),
+                                                    subtractAngles(cur_odom_angle_, -noise_a),
+                                                    prev_pose_loc_, prev_pose_angle_, lloc);
     
     // good at hard turn, looks the nicest without shifting, alternates direction though
-    Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), -cur_odom_angle_ - noise_a, 
-                                                    prev_pose_loc_, prev_pose_angle_, lloc);
+    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Vector2f(noise_x, noise_y), -cur_odom_angle_ - noise_a, 
+    //                                                 prev_pose_loc_, prev_pose_angle_, lloc);
     // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y), cur_odom_angle_ + noise_a, 
     //                                                 prev_pose_loc_, -prev_pose_angle_, lloc);
     
@@ -333,7 +333,7 @@ void SLAM::UpdateLookupTable(const vector<float>& ranges,
     // fill in range around this laser reading
     for (int x = min_idx_x; x <= max_idx_x; ++x) {
       for (int y = min_idx_y; y <= max_idx_y; ++y) {
-        float p = prob_sensor[x - (idx_x - MASK_SIZE / 2)][y - (idx_y - MASK_SIZE / 2)];
+        float p = prob_sensor[x - min_idx_x][y - min_idx_y];
         prev_prob_landmarks[x][y] = p > prev_prob_landmarks[x][y] ? p : prev_prob_landmarks[x][y];
       }
     }
