@@ -69,6 +69,8 @@ config_reader::ConfigReader config_reader_({"config/slam.lua"});
 
 SLAM::SLAM() :
     odom_initialized_(false), 
+    tmp_pose_loc_(0, 0),
+    tmp_pose_angle_(0),
     prev_pose_loc_(0, 0),
     prev_pose_angle_(0),
     cur_odom_loc_(0, 0),
@@ -84,6 +86,8 @@ SLAM::SLAM() :
         prob_sensor[i] = new float[MASK_SIZE];
       }
       n_log = 0;
+      n_lloc = 0;
+      n_transformed_lloc = 0;
     }
 
 SLAM::~SLAM() {
@@ -294,6 +298,8 @@ void SLAM::UpdatePose(const vector<float>& ranges,
   // cout << "delta: (" << cur_odom_loc_.x() - prev_pose_loc_.x();
   // cout << ", " << cur_odom_loc_.y() - prev_pose_loc_.y();
   // cout << ") " << cur_odom_angle_ - prev_pose_angle_ << endl;
+  tmp_pose_angle_ = prev_pose_angle_;
+  tmp_pose_loc_ = prev_pose_loc_;
   prev_pose_angle_ = subtractAngles(cur_odom_angle_, -max_p_da);
   Rotation2Df r(cur_odom_angle_);
   prev_pose_loc_ = cur_odom_loc_ + r * Vector2f(max_p_dx, max_p_dy);
@@ -408,6 +414,28 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   UpdatePose(ranges, range_min, range_max, angle_min, angle_max);
   prev_landmarks_initialized = true;
+  ofstream fd1("./logs/lloc/" + std::to_string(n_lloc) + ".csv");
+  ofstream fd2("./logs/lloc_trans/" + std::to_string(n_lloc) + ".csv");
+  if (fd1.is_open() || fd2.is_open()) {
+    float step_size = (angle_max - angle_min) / ranges.size();
+    for (size_t i = 0; i < ranges.size(); i++) {
+      float angle_i = angle_min + i * step_size;
+      float range_i = ranges[i];
+      if ( range_i > HORIZON - k_EPSILON  || range_i < range_min) {continue;}
+      Vector2f lloc(range_i * cos(angle_i), range_i * sin(angle_i));
+      Vector2f transformed_lloc = transformCurrToPrev(tmp_pose_loc_, tmp_pose_angle_,
+                                                      prev_pose_loc_, prev_pose_angle_, lloc);
+      fd1 << lloc.x() << "," << lloc.y() << endl;
+      fd2 << transformed_lloc.x() << "," << transformed_lloc.y() << endl;
+    }
+    fd1.close();
+    fd2.close();
+  } else {
+    perror("cannot open file\n");
+    exit(1);
+  }
+  ++n_lloc;
+  
 
   UpdateLookupTable(ranges, range_min, range_max, angle_min, angle_max);
 

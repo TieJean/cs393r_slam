@@ -84,6 +84,8 @@ class SLAM {
 
   // Previous odometry-reported locations.
   bool odom_initialized_;
+  Eigen::Vector2f tmp_pose_loc_;
+  float tmp_pose_angle_;
   Eigen::Vector2f prev_pose_loc_;
   float prev_pose_angle_;
   Eigen::Vector2f cur_odom_loc_;
@@ -122,6 +124,8 @@ class SLAM {
   vector<Vector2f> map_;
 
   size_t n_log;
+  size_t n_lloc;
+  size_t n_transformed_lloc;
 };
 }  // namespace slam
 
