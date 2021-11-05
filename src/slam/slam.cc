@@ -146,7 +146,7 @@ Vector2f transformCurrToPrev(const Vector2f& curr_pose_loc,
                              const float& prev_pose_angle, 
                              const Vector2f& lloc_curr) {
   Rotation2Df r(curr_pose_angle - prev_pose_angle);
-  return r * lloc_curr + curr_pose_loc - prev_pose_loc;
+  return r * lloc_curr + Rotation2Df(-prev_pose_angle) * (curr_pose_loc - prev_pose_loc);
 }
 
 /**
@@ -282,9 +282,12 @@ void SLAM::UpdatePose(const vector<float>& ranges,
   // cout << "delta: (" << cur_odom_loc_.x() - prev_pose_loc_.x();
   // cout << ", " << cur_odom_loc_.y() - prev_pose_loc_.y();
   // cout << ") " << cur_odom_angle_ - prev_pose_angle_ << endl;
+  
   prev_pose_angle_ = subtractAngles(cur_odom_angle_, -max_p_da);
-  Rotation2Df r(cur_odom_angle_);
-  prev_pose_loc_ = cur_odom_loc_ + r * Vector2f(max_p_dx, max_p_dy);
+  prev_pose_loc_ = transformCurrToPrev(cur_odom_loc_, cur_odom_angle_,
+                                       Vector2f(0, 0), 0.0, Vector2f(max_p_dx, max_p_dy));
+  // Rotation2Df r(cur_odom_angle_);
+  // prev_pose_loc_ = cur_odom_loc_ + r * Vector2f(max_p_dx, max_p_dy);
 }
 
 void SLAM::ReconstructMap(float lx, float ly) {
@@ -390,6 +393,19 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
     odom_initialized_ = true;
     cout << "init loc: (" << init_pose_loc_.x() << ", " << init_pose_loc_.y() << ") ";
     cout << "init angle: " << init_pose_angle_ << endl;
+    
+    Vector2f pose_loc1(1, 0);
+    float pose_angle1 = -M_PI_4;
+    Vector2f pose_loc2(0, 0);
+    float pose_angle2 = 3 * M_PI_4;
+    Vector2f lloc_curr(0, 1);
+
+    cout << "result: " << transformCurrToPrev(pose_loc1, pose_angle1, pose_loc2, pose_angle2, lloc_curr) << endl;
+    Rotation2Df r(pose_angle1 - pose_angle2);
+    cout << "cos: " << cos(pose_angle1 - pose_angle2) << endl;
+    cout << "sin: " << sin(pose_angle1 - pose_angle2) << endl;
+    cout << "delta: " << r * lloc_curr << endl;
+    // return r * lloc_curr + curr_pose_loc - prev_pose_loc;
   }
   // Keep track of odometry to estimate how far the robot has moved between 
   // poses.
