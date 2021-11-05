@@ -112,11 +112,11 @@ class SLAM {
   float** prev_prob_landmarks;
   bool prev_landmarks_initialized;
 
-  constexpr static float S_RANGE = 1.0; 
+  constexpr static float S_RANGE = 5.0; // TODO: FIXME
   constexpr static size_t MASK_SIZE = (size_t) (2 * S_RANGE / L_STEP) + 1;
   float** prob_sensor;
 
-  const float MIN_LOG_PROB = -1e6; // TODO: FIXME 
+  const float MIN_LOG_PROB = -10; // TODO: FIXME
 
   const float k_EPSILON = 1e-4;
   const int DOWNSAMPLE_RATE = 20;

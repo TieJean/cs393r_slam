@@ -1,5 +1,6 @@
 -- SENSOR_STD_DEV = 0.1;
-SENSOR_STD_DEV = 0.3; -- works best
+-- SENSOR_STD_DEV = 0.3; -- works best
+SENSOR_STD_DEV = 0.6;
 D_SHORT = SENSOR_STD_DEV * 1.5;
 D_LONG = SENSOR_STD_DEV * 2.0;
 P_OUTSIDE_RANGE = 1e-4;
