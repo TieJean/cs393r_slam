@@ -88,6 +88,8 @@ class SLAM {
   float tmp_pose_angle_;
   Eigen::Vector2f prev_pose_loc_;
   float prev_pose_angle_;
+  Eigen::Vector2f prev_odom_loc_;
+  float prev_odom_angle_;
   Eigen::Vector2f cur_odom_loc_;
   float cur_odom_angle_;
   Eigen::Vector2f init_pose_loc_;
@@ -115,8 +117,6 @@ class SLAM {
   constexpr static float S_RANGE = 5.0; // TODO: FIXME
   constexpr static size_t MASK_SIZE = (size_t) (2 * S_RANGE / L_STEP) + 1;
   float** prob_sensor;
-
-  const float MIN_LOG_PROB = -10; // TODO: FIXME
 
   const float k_EPSILON = 1e-4;
   const int DOWNSAMPLE_RATE = 20;
