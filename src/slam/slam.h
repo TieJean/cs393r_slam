@@ -94,13 +94,15 @@ class SLAM {
   float cur_odom_angle_;
   Eigen::Vector2f init_pose_loc_;
   float init_pose_angle_;
+  Eigen::Vector2f test_loc_;
+  float test_angle_;
 
   // pose constraints
   const float POSE_MIN_DELTA_A = M_PI / 180.0 * 30.0;
   const float POSE_MIN_DELTA_D = 0.5;
   
   // table constraints
-  constexpr static float NOISE_D_STEP = 0.05;
+  constexpr static float NOISE_D_STEP = 0.1;
   constexpr static float NOISE_A_STEP = M_PI / 180.0 * 5.0;
   
   constexpr static float NOISE_X_BOUND = 0.5;
