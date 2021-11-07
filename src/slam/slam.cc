@@ -295,9 +295,12 @@ void SLAM::UpdatePose(const vector<float>& ranges,
   tmp_pose_angle_ = prev_pose_angle_;
   tmp_pose_loc_ = prev_pose_loc_;
 
+  Vector2f diff = transformCurrToPrev(cur_odom_loc_, cur_odom_angle_, prev_odom_loc_, prev_odom_angle_, Vector2f(max_p_dx, max_p_dy));
+  Rotation2Df r(prev_pose_angle_);
+  prev_pose_loc_ = prev_pose_loc_ + r * diff;
   prev_pose_angle_ = subtractAngles(subtractAngles(prev_pose_angle_, -subtractAngles(cur_odom_angle_, prev_odom_angle_)), -max_p_da);
-  prev_pose_loc_ = prev_pose_loc_ + transformCurrToPrev(cur_odom_loc_, cur_odom_angle_,
-                                                        Vector2f(0, 0), 0.0, Vector2f(max_p_dx, max_p_dy)) - prev_odom_loc_;
+  // prev_pose_loc_ = prev_pose_loc_ + transformCurrToPrev(cur_odom_loc_, cur_odom_angle_,
+  //                                                       Vector2f(0, 0), 0.0, Vector2f(max_p_dx, max_p_dy)) - prev_odom_loc_;
   prev_odom_angle_ = cur_odom_angle_;
   prev_odom_loc_ = cur_odom_loc_;
   // cout << "n_lloc: " << n_lloc;
