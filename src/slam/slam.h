@@ -60,8 +60,8 @@ class SLAM {
   void GetPose(Eigen::Vector2f* loc, float* angle) const;
 
  private:
-  float GetMotionLikelihood(float x, float y, float a);
   void init();
+  float GetMotionLikelihood(float x, float y, float a);
   float GetObservationLikelihood(const vector<float>& ranges,
                                  float range_min,
                                  float range_max,
@@ -84,8 +84,6 @@ class SLAM {
 
   // Previous odometry-reported locations.
   bool odom_initialized_;
-  Eigen::Vector2f tmp_pose_loc_;
-  float tmp_pose_angle_;
   Eigen::Vector2f prev_pose_loc_;
   float prev_pose_angle_;
   Eigen::Vector2f prev_odom_loc_;
@@ -94,21 +92,20 @@ class SLAM {
   float cur_odom_angle_;
   Eigen::Vector2f init_pose_loc_;
   float init_pose_angle_;
-  Eigen::Vector2f test_loc_;
-  float test_angle_;
 
   // pose constraints
   const float POSE_MIN_DELTA_A = M_PI / 180.0 * 30.0;
   const float POSE_MIN_DELTA_D = 0.5;
   
   // table constraints
-  constexpr static float NOISE_D_STEP = 0.1;
-  constexpr static float NOISE_A_STEP = M_PI / 180.0 * 5.0;
+  constexpr static float NOISE_D_STEP = 0.05;
+  constexpr static float NOISE_A_STEP = M_PI / 180.0 * 2.0;
   
   constexpr static float NOISE_X_BOUND = 0.5;
   constexpr static float NOISE_Y_BOUND = 0.5;
   constexpr static float NOISE_A_BOUND = M_PI / 180.0 * 30.0;
 
+  // lookup table params
   constexpr static float HORIZON = 10.0;
   constexpr static float L_STEP = 0.05;
   constexpr static size_t L_WIDTH = (size_t) (2 * HORIZON / L_STEP) + 1;
@@ -116,18 +113,16 @@ class SLAM {
   float** prev_prob_landmarks;
   bool prev_landmarks_initialized;
 
-  constexpr static float S_RANGE = 5.0; // TODO: FIXME
+  constexpr static float S_RANGE = 5.0;
   constexpr static size_t MASK_SIZE = (size_t) (2 * S_RANGE / L_STEP) + 1;
   float** prob_sensor;
 
-  const float k_EPSILON = 1e-4;
+  // map params
   const int DOWNSAMPLE_RATE = 20;
   const Vector2f kLaserLoc = Vector2f(0.2, 0);
   vector<Vector2f> map_;
 
-  size_t n_log;
-  size_t n_lloc;
-  size_t n_transformed_lloc;
+  const float k_EPSILON = 1e-4;
 };
 }  // namespace slam
 
