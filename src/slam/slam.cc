@@ -233,7 +233,7 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
   // }
   
   // ofstream fd_pose;
-  // if(n_log == 6) {
+  // if(n_log == 15) {
   //   fd_pose.open("./logs/pose/" + std::to_string(n_log) + std::to_string(noise_x) + std::to_string(noise_y) + std::to_string(noise_a) + ".csv");
   //   if(!fd_pose.is_open()) perror("error opening file fd_pose!");
   // }
@@ -250,9 +250,6 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
                                          Vector2f(0, 0), 0.0, Vector2f(noise_x, noise_y));
     Vector2f transformed_lloc = transformCurrToPrev(predicted_cur_pose_loc, predicted_cur_pose_angle,
                                                     prev_odom_loc_, prev_odom_angle_, lloc);
-    // Vector2f transformed_lloc = transformCurrToPrev(cur_odom_loc_ + Rotation2Df(cur_odom_angle_) * Vector2f(noise_x, noise_y),
-    //                                                 subtractAngles(cur_odom_angle_, -noise_a),
-    //                                                 prev_pose_loc_, prev_pose_angle_, lloc);
     
     // get individual landmark likelihood from the lookup table
     float transformed_dist = sqrt(pow(transformed_lloc.x(), 2) + pow(transformed_lloc.y(), 2));
@@ -260,13 +257,12 @@ float SLAM::GetObservationLikelihood(const vector<float>& ranges,
     
     size_t landmark_idx_x = (size_t) round((transformed_lloc.x() + HORIZON) / L_STEP);
     size_t landmark_idx_y = (size_t) round((transformed_lloc.y() + HORIZON) / L_STEP);
-    // cout << prev_prob_landmarks[landmark_idx_x][landmark_idx_y] << ", ";
     
     p_landmark += prev_prob_landmarks[landmark_idx_x][landmark_idx_y];
-    // if(n_log == 6)
+    // if(n_log == 15)
     //   fd_pose << landmark_idx_x << "," << landmark_idx_y << "," << prev_prob_landmarks[landmark_idx_x][landmark_idx_y] << endl;
   }
-  // if(n_log == 6) {
+  // if(n_log == 15) {
   //   fd_pose << p_landmark << endl;
   //   fd_pose.close();
   // }
@@ -292,34 +288,35 @@ void SLAM::UpdatePose(const vector<float>& ranges,
   float max_p_dx = 0.0;
   float max_p_dy = 0.0;
   float max_p_da = 0.0;
-  float max_motion = CONFIG_MIN_LOG_PROB * 10;
-  float max_observ = CONFIG_MIN_LOG_PROB * 10;
+  // float max_motion = CONFIG_MIN_LOG_PROB * 10;
+  // float max_observ = CONFIG_MIN_LOG_PROB * 10;
   
   // check all possible poses of the car
   for (float noise_x = -NOISE_X_BOUND; noise_x < NOISE_X_BOUND; noise_x += NOISE_D_STEP) {
     for (float noise_y = -NOISE_Y_BOUND; noise_y < NOISE_Y_BOUND; noise_y += NOISE_D_STEP) {
       for (float noise_a = -NOISE_A_BOUND; noise_a < NOISE_A_BOUND; noise_a += NOISE_A_STEP) {
-        float p_motion = GetMotionLikelihood(noise_x, noise_y, noise_a);
+        // float p_motion = GetMotionLikelihood(noise_x, noise_y, noise_a);
         float p_landmark = GetObservationLikelihood(ranges, range_min, range_max, angle_min,
                                                     angle_max, noise_x, noise_y, noise_a);
         // float prob = p_motion + CONFIG_GAMMA * p_landmark;
         // float prob = CONFIG_GAMMA * p_motion + p_landmark;
         float prob = p_landmark;
+        // cout << "prob: " << prob << ", max_p: " << max_p << endl;
         if (prob > max_p) {
           max_p = prob;
           max_p_dx = noise_x;
           max_p_dy = noise_y;
           max_p_da = noise_a;
-          max_motion = p_motion;
-          max_observ = p_landmark;
+          // max_motion = p_motion;
+          // max_observ = p_landmark;
         }
       }
     }
   }
   // cout << GetMotionLikelihood(0.5, 0.0, 0.0) << endl;
   // cout << GetMotionLikelihood(0.0, 0.0, M_PI / 180.0 * 30.0) << endl;
-  cout << "max_p: " << max_p << ", " << CONFIG_GAMMA * max_motion << ", " << max_observ << endl;
-  // cout << "max_p_dx: " << max_p_dx << ", max_p_dy: " << max_p_dy << ", max_p_da: " << max_p_da << endl;
+  // cout << "max_p: " << max_p << ", " << CONFIG_GAMMA * max_motion << ", " << max_observ << endl;
+  cout << "max_p_dx: " << max_p_dx << ", max_p_dy: " << max_p_dy << ", max_p_da: " << max_p_da << endl;
   // cout << "delta: (" << cur_odom_loc_.x() - prev_pose_loc_.x();
   // cout << ", " << cur_odom_loc_.y() - prev_pose_loc_.y();
   // cout << ") " << cur_odom_angle_ - prev_pose_angle_ << endl;
@@ -356,27 +353,26 @@ void SLAM::UpdateLookupTable(const vector<float>& ranges,
   // reset the lookup table
   // cout << "*****************lookup table**************" << endl;
 
-  // if(n_log == 6) {
-  //   ofstream fd("./logs/lookup/" + std::to_string(n_log) + ".csv");
-  //   // fd.open("../logs/" + std::to_string(n_log) + ".csv", ios::out);
-  //   if (fd.is_open()) {
-  //     for (size_t i = 0; i < L_HEIGHT; ++i) {
-  //       for (size_t j = 0; j < L_WIDTH; ++j) {
-  //         fd << prev_prob_landmarks[i][j] << ",";
-  //         // printf("%4f, ", prev_prob_landmarks[i][j]);
-  //       }
-  //       fd << endl;
-  //     } 
-  //   } else {
-  //     perror("error opening file!");
-  //   }
-  //   fd.close();
+  // if(n_log == 12) {
+    // ofstream fd("./logs/lookup/" + std::to_string(n_log) + ".csv");
+    // // fd.open("../logs/" + std::to_string(n_log) + ".csv", ios::out);
+    // if (fd.is_open()) {
+    //   for (size_t i = 0; i < L_HEIGHT; ++i) {
+    //     for (size_t j = 0; j < L_WIDTH; ++j) {
+    //       fd << prev_prob_landmarks[i][j] << ",";
+    //       // printf("%4f, ", prev_prob_landmarks[i][j]);
+    //     }
+    //     fd << endl;
+    //   } 
+    // } else {
+    //   perror("error opening file!");
+    // }
+    // fd.close();
   // }
   // ++n_log;
 
   for (size_t i = 0; i < L_HEIGHT; ++i) {
     for (size_t j = 0; j < L_WIDTH; ++j) {
-      // printf("%4f, ", prev_prob_landmarks[i][j]);
       prev_prob_landmarks[i][j] = CONFIG_MIN_LOG_PROB;
     }
   }
